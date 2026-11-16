@@ -20,6 +20,10 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 fun TimeframeSignalTabs(result: ExchangeMultiTimeframeAnalysis) {
+    var sectionExpanded by remember(result.exchange, result.symbol) {
+        mutableStateOf(false)
+    }
+
     var selectedTimeframe by remember(result.exchange, result.symbol) {
         mutableStateOf("1h")
     }
@@ -54,111 +58,129 @@ fun TimeframeSignalTabs(result: ExchangeMultiTimeframeAnalysis) {
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text(
-            "سیگنال اختصاصی هر تایم‌فریم",
-            color = Color.White,
-            fontSize = 17.sp,
-            fontWeight = FontWeight.Bold
-        )
-
-        listOf(
-            listOf("5m", "15m", "1h"),
-            listOf("4h", "1d", "1w")
-        ).forEach { rowFrames ->
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                rowFrames.forEach { frame ->
-                    FilterChip(
-                        selected = selectedTimeframe == frame,
-                        onClick = { selectedTimeframe = frame },
-                        label = { Text(frame) }
-                    )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    sectionExpanded = !sectionExpanded
                 }
-            }
+                .padding(vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                "سیگنال اختصاصی هر تایم‌فریم",
+                color = Color(0xFFB68CFF),
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Bold
+            )
+
+            Text(
+                if (sectionExpanded) "▲" else "▼",
+                color = Color(0xFFB68CFF),
+                fontSize = 18.sp
+            )
         }
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = Color(0xFF211A32)
-            )
-        ) {
-            Column(
-                modifier = Modifier.padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    "$selectedTimeframe - سیگنال ${result.exchange}",
-                    color = Color(0xFFB68CFF),
-                    fontWeight = FontWeight.Bold
-                )
+        if (sectionExpanded) {
+            listOf(
+                listOf("5m", "15m", "1h"),
+                listOf("4h", "1d", "1w")
+            ).forEach { rowFrames ->
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    rowFrames.forEach { frame ->
+                        FilterChip(
+                            selected = selectedTimeframe == frame,
+                            onClick = { selectedTimeframe = frame },
+                            label = { Text(frame) }
+                        )
+                    }
+                }
+            }
 
-                if (selectedSignal == null) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFF211A32)
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     Text(
-                        "برای این تایم‌فریم داده کافی دریافت نشده است.",
-                        color = Color.LightGray
-                    )
-                } else {
-                    Text(
-                        "سیگنال: $signalText",
-                        color = signalColor,
-                        fontSize = 20.sp,
+                        "$selectedTimeframe - سیگنال ${result.exchange}",
+                        color = Color(0xFFB68CFF),
                         fontWeight = FontWeight.Bold
                     )
 
-                    Text(
-                        "امتیاز: ${selectedSignal.score} از ۹۰",
-                        color = Color.White
-                    )
+                    if (selectedSignal == null) {
+                        Text(
+                            "برای این تایم‌فریم داده کافی دریافت نشده است.",
+                            color = Color.LightGray
+                        )
+                    } else {
+                        Text(
+                            "سیگنال: $signalText",
+                            color = signalColor,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold
+                        )
 
-                    Text(
-                        "نقطه ورود: ${selectedSignal.entryPrice}",
-                        color = Color.White
-                    )
+                        Text(
+                            "امتیاز: ${selectedSignal.score} از ۹۰",
+                            color = Color.White
+                        )
 
-                    Text(
-                        "حد ضرر: ${selectedSignal.stopLoss}",
-                        color = Color(0xFFF87171)
-                    )
+                        Text(
+                            "نقطه ورود: ${selectedSignal.entryPrice}",
+                            color = Color.White
+                        )
 
-                    Text(
-                        "هدف اول: ${selectedSignal.takeProfit1}",
-                        color = Color(0xFF4ADE80)
-                    )
+                        Text(
+                            "حد ضرر: ${selectedSignal.stopLoss}",
+                            color = Color(0xFFF87171)
+                        )
 
-                    Text(
-                        "هدف دوم: ${selectedSignal.takeProfit2}",
-                        color = Color(0xFF4ADE80)
-                    )
+                        Text(
+                            "هدف اول: ${selectedSignal.takeProfit1}",
+                            color = Color(0xFF4ADE80)
+                        )
 
-                    if (selectedSignal.reasons.isNotEmpty()) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    reasonsExpanded = !reasonsExpanded
-                                }
-                                .padding(vertical = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                "دلایل سیگنال",
-                                color = Color(0xFFB68CFF),
-                                fontWeight = FontWeight.Bold
-                            )
+                        Text(
+                            "هدف دوم: ${selectedSignal.takeProfit2}",
+                            color = Color(0xFF4ADE80)
+                        )
 
-                            Text(
-                                if (reasonsExpanded) "▲" else "▼",
-                                color = Color(0xFFB68CFF)
-                            )
-                        }
-
-                        if (reasonsExpanded) {
-                            selectedSignal.reasons.forEach { reason ->
+                        if (selectedSignal.reasons.isNotEmpty()) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        reasonsExpanded = !reasonsExpanded
+                                    }
+                                    .padding(vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
                                 Text(
-                                    "• $reason",
-                                    color = Color.LightGray,
-                                    fontSize = 12.sp
+                                    "دلایل سیگنال",
+                                    color = Color(0xFFB68CFF),
+                                    fontWeight = FontWeight.Bold
                                 )
+
+                                Text(
+                                    if (reasonsExpanded) "▲" else "▼",
+                                    color = Color(0xFFB68CFF)
+                                )
+                            }
+
+                            if (reasonsExpanded) {
+                                selectedSignal.reasons.forEach { reason ->
+                                    Text(
+                                        "• $reason",
+                                        color = Color.LightGray,
+                                        fontSize = 12.sp
+                                    )
+                                }
                             }
                         }
                     }
