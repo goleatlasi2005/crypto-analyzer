@@ -13,7 +13,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
-
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 private val analysisBackground = Color(0xFF171326)
 private val analysisCard = Color(0xFF29213D)
 private val analysisPurple = Color(0xFFB68CFF)
@@ -31,7 +32,7 @@ fun AnalysisScreen(symbol: String) {
     }
 
     var multiResults by remember {
-        mutableStateOf<List<ExchangeMultiTimeframeAnalysis>>(emptyList())
+        mutableStateOf<List<Pair<String, List<Candle>>>>(emptyList())
     }
 
     var loading by remember { mutableStateOf(false) }
