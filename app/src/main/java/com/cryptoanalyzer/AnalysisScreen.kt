@@ -22,8 +22,15 @@ private val analysisPurple = Color(0xFFB68CFF)
 fun AnalysisScreen(symbol: String) {
 
     val scope = rememberCoroutineScope()
+    val candleRepository = remember { CandleRepository() }
 
-    var results by remember {
+    var timeframe by remember { mutableStateOf("1h") }
+
+    var chartResults by remember {
+        mutableStateOf<List<Pair<String, List<Candle>>>(emptyList())
+    }
+
+    var multiResults by remember {
         mutableStateOf<List<ExchangeMultiTimeframeAnalysis>>(emptyList())
     }
 
@@ -36,20 +43,47 @@ fun AnalysisScreen(symbol: String) {
             errorMessage = null
 
             try {
-                results = MultiTimeframeAnalysisRepository().analyze(symbol)
+                val chartData = kotlinx.coroutines.coroutineScope {
+                    val binance = async {
+                        runCatching {
+                            candleRepository.getBinanceCandles(
+                                symbol, timeframe, 100
+                            ).candles
+                        }.getOrNull()
+                    }
 
-                if (results.isEmpty()) {
-                    errorMessage = "اطلاعات کافی از صرافی‌ها دریافت نشد."
+                    val nobitex = async {
+                        runCatching {
+                            candleRepository.getNobitexCandles(
+                                symbol, timeframe, 100
+                            ).candles
+                        }.getOrNull()
+                    }
+
+                    listOfNotNull(
+                        binance.await()?.let { "Binance" to it },
+                        nobitex.await()?.let { "Nobitex" to it }
+                    )
                 }
+
+                chartResults = chartData
+
+                if (chartData.isEmpty()) {
+                    errorMessage = "اطلاعات نمودار از صرافی‌ها دریافت نشد."
+                }
+
+                multiResults =
+                    MultiTimeframeAnalysisRepository().analyze(symbol)
+
             } catch (e: Exception) {
-                errorMessage = e.message ?: "خطا در تحلیل بازار"
+                errorMessage = e.message ?: "خطا در دریافت اطلاعات بازار"
             } finally {
                 loading = false
             }
         }
     }
 
-    LaunchedEffect(symbol) {
+    LaunchedEffect(symbol, timeframe) {
         loadAnalysis()
     }
 
@@ -65,19 +99,41 @@ fun AnalysisScreen(symbol: String) {
 
                 item {
                     Text(
-                        "تحلیل ترکیبی $symbol",
+                        "تحلیل تکنیکال $symbol",
                         color = Color.White,
                         fontSize = 23.sp,
                         fontWeight = FontWeight.Bold
                     )
+                }
 
-                    Spacer(Modifier.height(6.dp))
-
+                item {
                     Text(
-                        "تحلیل هم‌زمان تایم‌فریم‌های 15m، 1h، 4h و 1d",
+                        "انتخاب تایم‌فریم نمودار",
                         color = analysisPurple,
-                        fontSize = 13.sp
+                        fontWeight = FontWeight.Bold
                     )
+
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf(
+                            listOf("5m", "15m", "1h"),
+                            listOf("4h", "1d", "1w")
+                        ).forEach { rowFrames ->
+                            Row(
+                                horizontalArrangement =
+                                    Arrangement.spacedBy(6.dp)
+                            ) {
+                                rowFrames.forEach { frame ->
+                                    FilterChip(
+                                        selected = timeframe == frame,
+                                        onClick = { timeframe = frame },
+                                        label = { Text(frame) }
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
 
                 item {
@@ -88,16 +144,18 @@ fun AnalysisScreen(symbol: String) {
                             containerColor = Color(0xFF8652D8)
                         )
                     ) {
-                        Text("به‌روزرسانی تحلیل")
+                        Text("به‌روزرسانی نمودار و تحلیل")
                     }
                 }
 
                 if (loading) {
                     item {
-                        CircularProgressIndicator(color = analysisPurple)
+                        CircularProgressIndicator(
+                            color = analysisPurple
+                        )
 
                         Text(
-                            "در حال تحلیل چندتایم‌فریمی بازار...",
+                            "در حال دریافت اطلاعات بازار...",
                             color = Color.LightGray
                         )
                     }
@@ -112,7 +170,55 @@ fun AnalysisScreen(symbol: String) {
                     }
                 }
 
-                items(results) { result ->
+                items(chartResults) { chart ->
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = analysisCard
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                "${chart.first} - نمودار $timeframe",
+                                color = analysisPurple,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            Text(
+                                "تعداد کندل: ${chart.second.size}",
+                                color = Color.LightGray
+                            )
+
+                            CandlestickChart(
+                                candles = chart.second
+                            )
+
+                            chart.second.lastOrNull()?.let { last ->
+                                Text(
+                                    "آخرین قیمت: ${last.close}",
+                                    color = Color.White
+                                )
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    Text(
+                        "تحلیل ترکیبی چندتایم‌فریمی",
+                        color = Color.White,
+                        fontSize = 21.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                items(multiResults) { result ->
 
                     val signalColor = when (result.finalType) {
                         SignalType.BUY -> Color(0xFF4ADE80)
@@ -128,27 +234,25 @@ fun AnalysisScreen(symbol: String) {
 
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(
                             containerColor = analysisCard
                         )
                     ) {
                         Column(
                             modifier = Modifier.padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                            verticalArrangement = Arrangement.spacedBy(9.dp)
                         ) {
-
                             Text(
                                 result.exchange,
                                 color = analysisPurple,
-                                fontSize = 20.sp,
+                                fontSize = 19.sp,
                                 fontWeight = FontWeight.Bold
                             )
 
                             Text(
                                 "سیگنال نهایی: $signalText",
                                 color = signalColor,
-                                fontSize = 23.sp,
+                                fontSize = 22.sp,
                                 fontWeight = FontWeight.Bold
                             )
 
@@ -164,62 +268,28 @@ fun AnalysisScreen(symbol: String) {
 
                             Divider(color = Color.DarkGray)
 
-                            Text(
-                                "وضعیت تایم‌فریم‌ها",
-                                color = analysisPurple,
-                                fontWeight = FontWeight.Bold
-                            )
-
                             result.timeframeSignals.forEach { frame ->
-
-                                val frameSignal = frame.signal
-
-                                val frameText = when (frameSignal?.type) {
+                                val frameText = when (frame.signal?.type) {
                                     SignalType.BUY -> "خرید"
                                     SignalType.SELL -> "فروش"
                                     SignalType.HOLD -> "نگهداری"
                                     null -> "داده کافی نیست"
                                 }
 
-                                val frameColor = when (frameSignal?.type) {
-                                    SignalType.BUY -> Color(0xFF4ADE80)
-                                    SignalType.SELL -> Color(0xFFF87171)
-                                    SignalType.HOLD -> Color(0xFFFBBF24)
-                                    null -> Color.Gray
-                                }
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(
-                                        frame.timeframe,
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold
-                                    )
-
-                                    Text(
-                                        frameText,
-                                        color = frameColor
-                                    )
-                                }
+                                Text(
+                                    "${frame.timeframe}: $frameText",
+                                    color = Color.LightGray
+                                )
                             }
 
                             val reference = result.referenceSignal
 
                             if (reference != null) {
-
                                 Divider(color = Color.DarkGray)
 
                                 Text(
-                                    "سطوح پیشنهادی معامله",
-                                    color = analysisPurple,
-                                    fontWeight = FontWeight.Bold
-                                )
-
-                                Text(
                                     "قیمت ورود: ${reference.entryPrice}",
-                                    color = Color.LightGray
+                                    color = Color.White
                                 )
 
                                 Text(
@@ -236,21 +306,14 @@ fun AnalysisScreen(symbol: String) {
                                     "هدف دوم: ${reference.takeProfit2}",
                                     color = Color(0xFF4ADE80)
                                 )
-
-                                Text(
-                                    "این سطوح از سیگنال یک تایم‌فریم مرجع گرفته شده‌اند و تضمین نتیجه نیستند.",
-                                    color = Color.Gray,
-                                    fontSize = 11.sp
-                                )
                             }
-
                         }
                     }
                 }
 
                 item {
                     Text(
-                        "توجه: این تحلیل‌ها آزمایشی هستند. امتیاز ترکیبی و درصد توافق، احتمال موفقیت معامله نیستند. قبل از استفاده واقعی باید استراتژی با داده‌های تاریخی بک‌تست و ارزیابی شود.",
+                        "نمودارها از داده‌های دریافتی صرافی‌ها رسم می‌شوند. تحلیل‌ها آزمایشی‌اند و امتیاز یا درصد توافق، احتمال موفقیت معامله نیست.",
                         color = Color.Gray,
                         fontSize = 12.sp
                     )
