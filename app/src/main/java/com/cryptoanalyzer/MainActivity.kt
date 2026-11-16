@@ -1,4 +1,3 @@
-
 package com.cryptoanalyzer
 
 import android.os.Bundle
@@ -125,11 +124,7 @@ private fun ExchangeCard(
                 fontSize = 19.sp,
                 fontWeight = FontWeight.Bold
             )
-            Text(
-                "$coin / USDT",
-                color = Color.White,
-                fontSize = 16.sp
-            )
+            Text("$coin / USDT", color = Color.White, fontSize = 16.sp)
 
             if (data != null) {
                 Text(
@@ -148,7 +143,11 @@ private fun ExchangeCard(
                 Text("بیشترین قیمت: $${formatNumber(data.high)}", color = Color.LightGray)
                 Text("کمترین قیمت: $${formatNumber(data.low)}", color = Color.LightGray)
                 Text("حجم: ${formatNumber(data.volume)} $coin", color = Color.LightGray)
-                Text("آخرین به‌روزرسانی: $updatedAt", color = Color(0xFFD8B4FE), fontSize = 12.sp)
+                Text(
+                    "آخرین به‌روزرسانی: $updatedAt",
+                    color = Color(0xFFD8B4FE),
+                    fontSize = 12.sp
+                )
             } else {
                 Text(
                     error ?: "در حال دریافت اطلاعات...",
@@ -162,6 +161,8 @@ private fun ExchangeCard(
 @Composable
 fun CryptoAnalyzerApp() {
     var selectedCoin by remember { mutableStateOf("BTC") }
+    var showAnalysis by remember { mutableStateOf(false) }
+
     var binance by remember { mutableStateOf<MarketTicker?>(null) }
     var nobitex by remember { mutableStateOf<MarketTicker?>(null) }
     var binanceError by remember { mutableStateOf<String?>(null) }
@@ -198,115 +199,143 @@ fun CryptoAnalyzerApp() {
             modifier = Modifier.fillMaxSize(),
             color = Color(0xFF171126)
         ) {
-            LazyColumn(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                item {
-                    Text(
-                        "Crypto Analyzer",
-                        color = Color(0xFFE9D5FF),
-                        fontSize = 27.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        "تحلیل هوشمند بازار ارز دیجیتال",
-                        color = Color.LightGray
-                    )
-                }
-
-                item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        listOf("BTC", "ETH").forEach { coin ->
-                            Button(
-                                onClick = { selectedCoin = coin },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (selectedCoin == coin)
-                                        Color(0xFF9333EA) else Color(0xFF3B3150)
-                                )
-                            ) {
-                                Text(coin)
-                            }
-                        }
-                    }
-                }
-
-                item {
-                    ExchangeCard(
-                        "Binance",
-                        selectedCoin,
-                        binance,
-                        binanceError,
-                        updatedAt
-                    )
-                }
-
-                item {
-                    ExchangeCard(
-                        "Nobitex",
-                        selectedCoin,
-                        nobitex,
-                        nobitexError,
-                        updatedAt
-                    )
-                }
-
-                item {
-                    val a = binance?.price
-                    val b = nobitex?.price
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = Color(0xFF29213D)
+            if (showAnalysis) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    Button(
+                        onClick = { showAnalysis = false },
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF9333EA)
                         )
                     ) {
-                        Column(Modifier.padding(18.dp)) {
-                            Text(
-                                "مقایسه قیمت دو صرافی",
-                                color = Color(0xFFD8B4FE),
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            if (a != null && b != null) {
-                                Text(
-                                    "اختلاف قیمت: $${formatNumber(kotlin.math.abs(a - b))}",
-                                    color = Color.White
-                                )
-                            } else {
-                                Text(
-                                    "پس از دریافت قیمت هر دو صرافی نمایش داده می‌شود.",
-                                    color = Color.LightGray
-                                )
+                        Text("بازگشت به صفحه اصلی")
+                    }
+
+                    Box(modifier = Modifier.weight(1f)) {
+                        AnalysisScreen(symbol = selectedCoin)
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    item {
+                        Text(
+                            "Crypto Analyzer",
+                            color = Color(0xFFE9D5FF),
+                            fontSize = 27.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            "تحلیل هوشمند بازار ارز دیجیتال",
+                            color = Color.LightGray
+                        )
+                    }
+
+                    item {
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            listOf("BTC", "ETH").forEach { coin ->
+                                Button(
+                                    onClick = { selectedCoin = coin },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (selectedCoin == coin)
+                                            Color(0xFF9333EA) else Color(0xFF3B3150)
+                                    )
+                                ) {
+                                    Text(coin)
+                                }
                             }
                         }
                     }
-                }
 
-                item {
-                    Text("تایم‌فریم‌ها", color = Color.White, fontSize = 18.sp)
-                    Text("5m   15m   1h   4h   1d   1w", color = Color.LightGray)
-                }
+                    item {
+                        ExchangeCard(
+                            "Binance",
+                            selectedCoin,
+                            binance,
+                            binanceError,
+                            updatedAt
+                        )
+                    }
 
-                item {
-                    Text("سیگنال تحلیل", color = Color.White, fontSize = 18.sp)
-                    Text(
-                        "در انتظار پیاده‌سازی اندیکاتورها",
-                        color = Color(0xFFFBBF24)
-                    )
-                }
+                    item {
+                        ExchangeCard(
+                            "Nobitex",
+                            selectedCoin,
+                            nobitex,
+                            nobitexError,
+                            updatedAt
+                        )
+                    }
 
-                item {
-                    Text(
-                        "RSI • MACD • EMA • SMA • Bollinger Bands • Ichimoku • Fibonacci • Volume",
-                        color = Color.LightGray
-                    )
-                }
+                    item {
+                        val a = binance?.price
+                        val b = nobitex?.price
 
-                item {
-                    Text(
-                        "این برنامه فقط تحلیل ارائه می‌دهد و هیچ معامله‌ای انجام نمی‌دهد.",
-                        color = Color.Gray,
-                        fontSize = 12.sp
-                    )
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = Color(0xFF29213D)
+                            )
+                        ) {
+                            Column(Modifier.padding(18.dp)) {
+                                Text(
+                                    "مقایسه قیمت دو صرافی",
+                                    color = Color(0xFFD8B4FE),
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                if (a != null && b != null) {
+                                    Text(
+                                        "اختلاف قیمت: $${formatNumber(kotlin.math.abs(a - b))}",
+                                        color = Color.White
+                                    )
+                                } else {
+                                    Text(
+                                        "پس از دریافت قیمت هر دو صرافی نمایش داده می‌شود.",
+                                        color = Color.LightGray
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    item {
+                        Button(
+                            onClick = { showAnalysis = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF9333EA)
+                            )
+                        ) {
+                            Text(
+                                "تحلیل تکنیکال $selectedCoin",
+                                fontSize = 17.sp
+                            )
+                        }
+                    }
+
+                    item {
+                        Text(
+                            "تایم‌فریم‌ها: 5m • 15m • 1h • 4h • 1d • 1w",
+                            color = Color.LightGray
+                        )
+                    }
+
+                    item {
+                        Text(
+                            "RSI • MACD • EMA • SMA • Bollinger Bands • Ichimoku • Fibonacci • Volume",
+                            color = Color.LightGray
+                        )
+                    }
+
+                    item {
+                        Text(
+                            "این برنامه فقط تحلیل ارائه می‌دهد و هیچ معامله‌ای انجام نمی‌دهد.",
+                            color = Color.Gray,
+                            fontSize = 12.sp
+                        )
+                    }
                 }
             }
         }
