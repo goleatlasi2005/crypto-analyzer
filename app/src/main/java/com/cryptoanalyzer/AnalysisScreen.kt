@@ -159,6 +159,22 @@ fun AnalysisScreen(symbol: String) {
                         fontSize = 23.sp,
                         fontWeight = FontWeight.Bold
                     )
+
+                    Button(
+                        onClick = {
+                            loadAnalysis()
+                            loadSupportResistance()
+                        },
+                        enabled = !loading && !supportLoading,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF8652D8)
+                        )
+                    ) {
+                        Text("⟳ به‌روزرسانی کل صفحه")
+                    }
                 }
 
                 // بخش کشویی نمودار
@@ -226,6 +242,14 @@ fun AnalysisScreen(symbol: String) {
                                     }
                                 }
 
+                                if (loading) {
+                                    CircularProgressIndicator(color = analysisPurple)
+                                    Text(
+                                        "در حال دریافت اطلاعات بازار...",
+                                        color = Color.LightGray
+                                    )
+                                }
+
                                 Button(
                                     onClick = { loadAnalysis() },
                                     enabled = !loading,
@@ -233,15 +257,7 @@ fun AnalysisScreen(symbol: String) {
                                         containerColor = Color(0xFF8652D8)
                                     )
                                 ) {
-                                    Text("به‌روزرسانی نمودار و تحلیل")
-                                }
-
-                                if (loading) {
-                                    CircularProgressIndicator(color = analysisPurple)
-                                    Text(
-                                        "در حال دریافت اطلاعات بازار...",
-                                        color = Color.LightGray
-                                    )
+                                    Text("⟳ به‌روزرسانی نمودار و تحلیل")
                                 }
 
                                 if (errorMessage != null) {
@@ -355,6 +371,16 @@ fun AnalysisScreen(symbol: String) {
                                             }
                                         }
                                     }
+                                }
+
+                                Button(
+                                    onClick = { loadSupportResistance() },
+                                    enabled = !supportLoading,
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFF8652D8)
+                                    )
+                                ) {
+                                    Text("⟳ به‌روزرسانی حمایت و مقاومت")
                                 }
 
                                 if (supportLoading) {
