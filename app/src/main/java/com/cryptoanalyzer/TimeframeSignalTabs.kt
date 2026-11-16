@@ -1,6 +1,7 @@
 
 package com.cryptoanalyzer
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -21,6 +22,14 @@ import androidx.compose.ui.unit.sp
 fun TimeframeSignalTabs(result: ExchangeMultiTimeframeAnalysis) {
     var selectedTimeframe by remember(result.exchange, result.symbol) {
         mutableStateOf("1h")
+    }
+
+    var reasonsExpanded by remember(
+        result.exchange,
+        result.symbol,
+        selectedTimeframe
+    ) {
+        mutableStateOf(false)
     }
 
     val selectedSignal = result.timeframeSignals
@@ -95,20 +104,62 @@ fun TimeframeSignalTabs(result: ExchangeMultiTimeframeAnalysis) {
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
                     )
-                    Text("امتیاز: ${selectedSignal.score} از ۹۰", color = Color.White)
-                    Text("نقطه ورود: ${selectedSignal.entryPrice}", color = Color.White)
-                    Text("حد ضرر: ${selectedSignal.stopLoss}", color = Color(0xFFF87171))
-                    Text("هدف اول: ${selectedSignal.takeProfit1}", color = Color(0xFF4ADE80))
-                    Text("هدف دوم: ${selectedSignal.takeProfit2}", color = Color(0xFF4ADE80))
+
+                    Text(
+                        "امتیاز: ${selectedSignal.score} از ۹۰",
+                        color = Color.White
+                    )
+
+                    Text(
+                        "نقطه ورود: ${selectedSignal.entryPrice}",
+                        color = Color.White
+                    )
+
+                    Text(
+                        "حد ضرر: ${selectedSignal.stopLoss}",
+                        color = Color(0xFFF87171)
+                    )
+
+                    Text(
+                        "هدف اول: ${selectedSignal.takeProfit1}",
+                        color = Color(0xFF4ADE80)
+                    )
+
+                    Text(
+                        "هدف دوم: ${selectedSignal.takeProfit2}",
+                        color = Color(0xFF4ADE80)
+                    )
 
                     if (selectedSignal.reasons.isNotEmpty()) {
-                        Text(
-                            "دلایل سیگنال:",
-                            color = Color(0xFFB68CFF),
-                            fontWeight = FontWeight.Bold
-                        )
-                        selectedSignal.reasons.forEach { reason ->
-                            Text("• $reason", color = Color.LightGray, fontSize = 12.sp)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    reasonsExpanded = !reasonsExpanded
+                                }
+                                .padding(vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                "دلایل سیگنال",
+                                color = Color(0xFFB68CFF),
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            Text(
+                                if (reasonsExpanded) "▲" else "▼",
+                                color = Color(0xFFB68CFF)
+                            )
+                        }
+
+                        if (reasonsExpanded) {
+                            selectedSignal.reasons.forEach { reason ->
+                                Text(
+                                    "• $reason",
+                                    color = Color.LightGray,
+                                    fontSize = 12.sp
+                                )
+                            }
                         }
                     }
                 }
