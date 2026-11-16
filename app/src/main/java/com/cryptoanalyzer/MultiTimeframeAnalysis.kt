@@ -3,6 +3,7 @@ package com.cryptoanalyzer
 
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlin.math.abs
 
 data class TimeframeSignal(
     val timeframe: String,
@@ -22,7 +23,6 @@ data class ExchangeMultiTimeframeAnalysis(
 class MultiTimeframeAnalysisRepository(
     private val analysisRepository: AnalysisRepository = AnalysisRepository()
 ) {
-    // وزن تایم‌فریم‌های بلندمدت بیشتر است؛ 5m نویز بیشتری دارد.
     private val timeframeWeights = linkedMapOf(
         "5m" to 0.5,
         "15m" to 0.75,
@@ -103,21 +103,19 @@ class MultiTimeframeAnalysisRepository(
                     .toInt()
             }
 
-            // یک‌ساعته مرجع اصلی قیمت ورود است.
-            // در نبود آن، تایم‌فریم‌های معتبر بعدی بررسی می‌شوند.
-            val referencePriority = listOf(
-                "1h", "4h", "15m", "1d", "5m", "1w"
-            )
-
+            // انتخاب قوی‌ترین سیگنال هم‌جهت با نتیجه نهایی
+            // با در نظر گرفتن وزن تایم‌فریم
             val referenceSignal = if (finalType == SignalType.HOLD) {
                 null
             } else {
-                referencePriority.firstNotNullOfOrNull { timeframe ->
-                    frameSignals.firstOrNull {
-                        it.timeframe == timeframe &&
-                            it.signal?.type == finalType
-                    }?.signal
-                }
+                validSignals
+                    .filter { it.second.type == finalType }
+                    .maxByOrNull { (_, signal, weight) ->
+                        abs(signal.score) * weight
+                    }?.second
+                    ?: validSignals.maxByOrNull { (_, signal, weight) ->
+                        abs(signal.score) * weight
+                    }?.second
             }
 
             ExchangeMultiTimeframeAnalysis(
