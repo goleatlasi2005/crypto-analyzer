@@ -31,6 +31,9 @@ fun AnalysisScreen(symbol: String) {
     var timeframe by remember { mutableStateOf("1h") }
     var supportTimeframe by remember { mutableStateOf("5m") }
 
+    var chartExpanded by remember { mutableStateOf(false) }
+    var supportExpanded by remember { mutableStateOf(false) }
+
     var chartResults by remember {
         mutableStateOf<List<Pair<String, List<Candle>>>>(emptyList())
     }
@@ -158,218 +161,279 @@ fun AnalysisScreen(symbol: String) {
                     )
                 }
 
+                // بخش کشویی نمودار
                 item {
-                    Text(
-                        "انتخاب تایم‌فریم نمودار",
-                        color = analysisPurple,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        listOf(
-                            listOf("5m", "15m", "1h"),
-                            listOf("4h", "1d", "1w")
-                        ).forEach { rowFrames ->
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                rowFrames.forEach { frame ->
-                                    FilterChip(
-                                        selected = timeframe == frame,
-                                        onClick = { timeframe = frame },
-                                        label = { Text(frame) }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                item {
-                    Button(
-                        onClick = { loadAnalysis() },
-                        enabled = !loading,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF8652D8)
-                        )
-                    ) {
-                        Text("به‌روزرسانی نمودار و تحلیل")
-                    }
-                }
-
-                if (loading) {
-                    item {
-                        CircularProgressIndicator(color = analysisPurple)
-                        Text(
-                            "در حال دریافت اطلاعات بازار...",
-                            color = Color.LightGray
-                        )
-                    }
-                }
-
-                if (errorMessage != null) {
-                    item {
-                        Text(
-                            errorMessage!!,
-                            color = Color(0xFFF87171)
-                        )
-                    }
-                }
-
-                items(chartResults) { chart ->
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = analysisCard
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text(
-                                "${chart.first} - نمودار $timeframe",
-                                color = analysisPurple,
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-
-                            Text(
-                                "تعداد کندل: ${chart.second.size}",
-                                color = Color.LightGray
-                            )
-
-                            CandlestickChart(candles = chart.second)
-
-                            chart.second.lastOrNull()?.let { last ->
-                                Text(
-                                    "آخرین قیمت: ${last.close}",
-                                    color = Color.White
-                                )
-                            }
-                        }
-                    }
-                }
-
-                item {
-                    Text(
-                        "حمایت و مقاومت",
-                        color = Color.White,
-                        fontSize = 21.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    Text(
-                        "انتخاب تایم‌فریم سطوح:",
-                        color = analysisPurple
-                    )
-
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        listOf(
-                            listOf("5m", "15m", "1h"),
-                            listOf("4h", "1d", "1w")
-                        ).forEach { rowFrames ->
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                rowFrames.forEach { frame ->
-                                    FilterChip(
-                                        selected = supportTimeframe == frame,
-                                        onClick = {
-                                            supportTimeframe = frame
-                                        },
-                                        label = { Text(frame) }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if (supportLoading) {
-                    item {
-                        CircularProgressIndicator(color = analysisPurple)
-                        Text(
-                            "در حال محاسبه حمایت و مقاومت...",
-                            color = Color.LightGray
-                        )
-                    }
-                }
-
-                if (!supportLoading && supportResults.isEmpty()) {
-                    item {
-                        Text(
-                            "سطوح در دسترس نیستند یا داده کافی دریافت نشده است.",
-                            color = Color.LightGray
-                        )
-                    }
-                }
-
-                items(supportResults) { exchangeResult ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
                         colors = CardDefaults.cardColors(
                             containerColor = analysisCard
                         )
                     ) {
                         Column(
                             modifier = Modifier.padding(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Text(
-                                "${exchangeResult.first} - $supportTimeframe",
-                                color = analysisPurple,
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-
-                            if (exchangeResult.second.isEmpty()) {
-                                Text(
-                                    "سطح قابل محاسبه‌ای با داده فعلی پیدا نشد.",
-                                    color = Color.LightGray
-                                )
+                            TextButton(
+                                onClick = {
+                                    chartExpanded = !chartExpanded
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        "📊 نمودار قیمت",
+                                        color = Color.White,
+                                        fontSize = 19.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        if (chartExpanded) "▲" else "▼",
+                                        color = analysisPurple,
+                                        fontSize = 18.sp
+                                    )
+                                }
                             }
 
-                            exchangeResult.second.forEach { level ->
-                                val sideText =
-                                    if (level.side == LevelSide.SUPPORT)
-                                        "حمایت"
-                                    else
-                                        "مقاومت"
-
-                                val sideColor =
-                                    if (level.side == LevelSide.SUPPORT)
-                                        Color(0xFF4ADE80)
-                                    else
-                                        Color(0xFFF87171)
-
+                            if (chartExpanded) {
                                 Text(
-                                    "$sideText | ${level.kind} | قیمت: ${level.price}",
-                                    color = sideColor,
+                                    "انتخاب تایم‌فریم نمودار",
+                                    color = analysisPurple,
                                     fontWeight = FontWeight.Bold
                                 )
 
-                                Text(
-                                    "فاصله: ${"%.2f".format(level.distancePercent)}٪ | قدرت تخمینی: ${level.strength}/100 | برخوردهای محوری: ${level.touches}",
-                                    color = Color.LightGray,
-                                    fontSize = 12.sp
-                                )
+                                Column(
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    listOf(
+                                        listOf("5m", "15m", "1h"),
+                                        listOf("4h", "1d", "1w")
+                                    ).forEach { rowFrames ->
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            rowFrames.forEach { frame ->
+                                                FilterChip(
+                                                    selected = timeframe == frame,
+                                                    onClick = { timeframe = frame },
+                                                    label = { Text(frame) }
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Button(
+                                    onClick = { loadAnalysis() },
+                                    enabled = !loading,
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFF8652D8)
+                                    )
+                                ) {
+                                    Text("به‌روزرسانی نمودار و تحلیل")
+                                }
+
+                                if (loading) {
+                                    CircularProgressIndicator(color = analysisPurple)
+                                    Text(
+                                        "در حال دریافت اطلاعات بازار...",
+                                        color = Color.LightGray
+                                    )
+                                }
+
+                                if (errorMessage != null) {
+                                    Text(
+                                        errorMessage!!,
+                                        color = Color(0xFFF87171)
+                                    )
+                                }
+
+                                chartResults.forEach { chart ->
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(16.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = Color(0xFF211A32)
+                                        )
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.padding(12.dp),
+                                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Text(
+                                                "${chart.first} - نمودار $timeframe",
+                                                color = analysisPurple,
+                                                fontSize = 18.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+
+                                            Text(
+                                                "تعداد کندل: ${chart.second.size}",
+                                                color = Color.LightGray
+                                            )
+
+                                            CandlestickChart(candles = chart.second)
+
+                                            chart.second.lastOrNull()?.let { last ->
+                                                Text(
+                                                    "آخرین قیمت: ${last.close}",
+                                                    color = Color.White
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
                 }
 
+                // بخش کشویی حمایت و مقاومت
                 item {
-                    Text(
-                        "سطوح استاتیک از پیوت‌های اخیر و سطوح داینامیک از EMA20، EMA50 و کیجون ایچیموکو محاسبه می‌شوند. قدرت سطوح تخمینی است و واکنش قیمت را تضمین نمی‌کند.",
-                        color = Color.Gray,
-                        fontSize = 12.sp
-                    )
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = analysisCard
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            TextButton(
+                                onClick = {
+                                    supportExpanded = !supportExpanded
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        "📈 حمایت و مقاومت",
+                                        color = Color.White,
+                                        fontSize = 19.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        if (supportExpanded) "▲" else "▼",
+                                        color = analysisPurple,
+                                        fontSize = 18.sp
+                                    )
+                                }
+                            }
+
+                            if (supportExpanded) {
+                                Text(
+                                    "انتخاب تایم‌فریم سطوح:",
+                                    color = analysisPurple
+                                )
+
+                                Column(
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    listOf(
+                                        listOf("5m", "15m", "1h"),
+                                        listOf("4h", "1d", "1w")
+                                    ).forEach { rowFrames ->
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            rowFrames.forEach { frame ->
+                                                FilterChip(
+                                                    selected = supportTimeframe == frame,
+                                                    onClick = {
+                                                        supportTimeframe = frame
+                                                    },
+                                                    label = { Text(frame) }
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if (supportLoading) {
+                                    CircularProgressIndicator(color = analysisPurple)
+                                    Text(
+                                        "در حال محاسبه حمایت و مقاومت...",
+                                        color = Color.LightGray
+                                    )
+                                }
+
+                                if (!supportLoading && supportResults.isEmpty()) {
+                                    Text(
+                                        "سطوح در دسترس نیستند یا داده کافی دریافت نشده است.",
+                                        color = Color.LightGray
+                                    )
+                                }
+
+                                supportResults.forEach { exchangeResult ->
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = Color(0xFF211A32)
+                                        )
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.padding(14.dp),
+                                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Text(
+                                                "${exchangeResult.first} - $supportTimeframe",
+                                                color = analysisPurple,
+                                                fontSize = 18.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+
+                                            if (exchangeResult.second.isEmpty()) {
+                                                Text(
+                                                    "سطح قابل محاسبه‌ای با داده فعلی پیدا نشد.",
+                                                    color = Color.LightGray
+                                                )
+                                            }
+
+                                            exchangeResult.second.forEach { level ->
+                                                val sideText =
+                                                    if (level.side == LevelSide.SUPPORT)
+                                                        "حمایت"
+                                                    else
+                                                        "مقاومت"
+
+                                                val sideColor =
+                                                    if (level.side == LevelSide.SUPPORT)
+                                                        Color(0xFF4ADE80)
+                                                    else
+                                                        Color(0xFFF87171)
+
+                                                Text(
+                                                    "$sideText | ${level.kind} | قیمت: ${level.price}",
+                                                    color = sideColor,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+
+                                                Text(
+                                                    "فاصله: ${"%.2f".format(level.distancePercent)}٪ | قدرت تخمینی: ${level.strength}/100 | برخوردهای محوری: ${level.touches}",
+                                                    color = Color.LightGray,
+                                                    fontSize = 12.sp
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Text(
+                                    "سطوح استاتیک از پیوت‌های اخیر و سطوح داینامیک از EMA20، EMA50 و کیجون ایچیموکو محاسبه می‌شوند. قدرت سطوح تخمینی است و واکنش قیمت را تضمین نمی‌کند.",
+                                    color = Color.Gray,
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+                    }
                 }
 
                 item {
