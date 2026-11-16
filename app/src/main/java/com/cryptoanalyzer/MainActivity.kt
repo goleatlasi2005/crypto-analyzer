@@ -1,3 +1,4 @@
+
 package com.cryptoanalyzer
 
 import android.os.Bundle
@@ -169,7 +170,9 @@ fun CryptoAnalyzerApp() {
     var nobitexError by remember { mutableStateOf<String?>(null) }
     var updatedAt by remember { mutableStateOf("") }
 
-    LaunchedEffect(selectedCoin) {
+    var manualRefresh by remember { mutableStateOf(0) }
+
+    LaunchedEffect(selectedCoin, manualRefresh) {
         while (true) {
             try {
                 binance = fetchBinance("${selectedCoin}USDT")
@@ -246,6 +249,18 @@ fun CryptoAnalyzerApp() {
                                     Text(coin)
                                 }
                             }
+                        }
+                    }
+
+                    item {
+                        Button(
+                            onClick = { manualRefresh++ },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF9333EA)
+                            )
+                        ) {
+                            Text("⟳ به‌روزرسانی قیمت‌ها")
                         }
                     }
 
