@@ -12,9 +12,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 
 private val analysisBackground = Color(0xFF171326)
 private val analysisCard = Color(0xFF29213D)
@@ -27,6 +27,7 @@ fun AnalysisScreen(symbol: String) {
     val candleRepository = remember { CandleRepository() }
 
     var timeframe by remember { mutableStateOf("1h") }
+    var supportTimeframe by remember { mutableStateOf("5m") }
 
     var chartResults by remember {
         mutableStateOf<List<Pair<String, List<Candle>>>>(emptyList())
@@ -36,7 +37,12 @@ fun AnalysisScreen(symbol: String) {
         mutableStateOf<List<ExchangeMultiTimeframeAnalysis>>(emptyList())
     }
 
+    var supportResults by remember {
+        mutableStateOf<List<Pair<String, List<SupportResistanceLevel>>>>(emptyList())
+    }
+
     var loading by remember { mutableStateOf(false) }
+    var supportLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     fun loadAnalysis() {
@@ -85,8 +91,50 @@ fun AnalysisScreen(symbol: String) {
         }
     }
 
+    fun loadSupportResistance() {
+        scope.launch {
+            supportLoading = true
+            supportResults = emptyList()
+
+            try {
+                supportResults = coroutineScope {
+                    val binance = async {
+                        runCatching {
+                            candleRepository.getBinanceCandles(
+                                symbol, supportTimeframe, 200
+                            ).candles
+                        }.getOrNull()
+                    }
+
+                    val nobitex = async {
+                        runCatching {
+                            candleRepository.getNobitexCandles(
+                                symbol, supportTimeframe, 200
+                            ).candles
+                        }.getOrNull()
+                    }
+
+                    listOfNotNull(
+                        binance.await()?.let {
+                            "Binance" to SupportResistanceEngine.analyze(it)
+                        },
+                        nobitex.await()?.let {
+                            "Nobitex" to SupportResistanceEngine.analyze(it)
+                        }
+                    )
+                }
+            } finally {
+                supportLoading = false
+            }
+        }
+    }
+
     LaunchedEffect(symbol, timeframe) {
         loadAnalysis()
+    }
+
+    LaunchedEffect(symbol, supportTimeframe) {
+        loadSupportResistance()
     }
 
     MaterialTheme {
@@ -151,10 +199,7 @@ fun AnalysisScreen(symbol: String) {
 
                 if (loading) {
                     item {
-                        CircularProgressIndicator(
-                            color = analysisPurple
-                        )
-
+                        CircularProgressIndicator(color = analysisPurple)
                         Text(
                             "در حال دریافت اطلاعات بازار...",
                             color = Color.LightGray
@@ -172,7 +217,6 @@ fun AnalysisScreen(symbol: String) {
                 }
 
                 items(chartResults) { chart ->
-
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
@@ -196,9 +240,7 @@ fun AnalysisScreen(symbol: String) {
                                 color = Color.LightGray
                             )
 
-                            CandlestickChart(
-                                candles = chart.second
-                            )
+                            CandlestickChart(candles = chart.second)
 
                             chart.second.lastOrNull()?.let { last ->
                                 Text(
@@ -208,6 +250,124 @@ fun AnalysisScreen(symbol: String) {
                             }
                         }
                     }
+                }
+
+                item {
+                    Text(
+                        "حمایت و مقاومت",
+                        color = Color.White,
+                        fontSize = 21.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Text(
+                        "انتخاب تایم‌فریم سطوح:",
+                        color = analysisPurple
+                    )
+
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf(
+                            listOf("5m", "15m", "1h"),
+                            listOf("4h", "1d", "1w")
+                        ).forEach { rowFrames ->
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                rowFrames.forEach { frame ->
+                                    FilterChip(
+                                        selected = supportTimeframe == frame,
+                                        onClick = {
+                                            supportTimeframe = frame
+                                        },
+                                        label = { Text(frame) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (supportLoading) {
+                    item {
+                        CircularProgressIndicator(color = analysisPurple)
+                        Text(
+                            "در حال محاسبه حمایت و مقاومت...",
+                            color = Color.LightGray
+                        )
+                    }
+                }
+
+                if (!supportLoading && supportResults.isEmpty()) {
+                    item {
+                        Text(
+                            "سطوح در دسترس نیستند یا داده کافی دریافت نشده است.",
+                            color = Color.LightGray
+                        )
+                    }
+                }
+
+                items(supportResults) { exchangeResult ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = analysisCard
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                "${exchangeResult.first} - $supportTimeframe",
+                                color = analysisPurple,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            if (exchangeResult.second.isEmpty()) {
+                                Text(
+                                    "سطح قابل محاسبه‌ای با داده فعلی پیدا نشد.",
+                                    color = Color.LightGray
+                                )
+                            }
+
+                            exchangeResult.second.forEach { level ->
+                                val sideText =
+                                    if (level.side == LevelSide.SUPPORT)
+                                        "حمایت"
+                                    else
+                                        "مقاومت"
+
+                                val sideColor =
+                                    if (level.side == LevelSide.SUPPORT)
+                                        Color(0xFF4ADE80)
+                                    else
+                                        Color(0xFFF87171)
+
+                                Text(
+                                    "$sideText | ${level.kind} | قیمت: ${level.price}",
+                                    color = sideColor,
+                                    fontWeight = FontWeight.Bold
+                                )
+
+                                Text(
+                                    "فاصله: ${"%.2f".format(level.distancePercent)}٪ | قدرت تخمینی: ${level.strength}/100 | برخوردهای محوری: ${level.touches}",
+                                    color = Color.LightGray,
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    Text(
+                        "سطوح استاتیک از پیوت‌های اخیر و سطوح داینامیک از EMA20، EMA50 و کیجون ایچیموکو محاسبه می‌شوند. قدرت سطوح تخمینی است و واکنش قیمت را تضمین نمی‌کند.",
+                        color = Color.Gray,
+                        fontSize = 12.sp
+                    )
                 }
 
                 item {
@@ -314,7 +474,7 @@ fun AnalysisScreen(symbol: String) {
 
                 item {
                     Text(
-                        "نمودارها از داده‌های دریافتی صرافی‌ها رسم می‌شوند. تحلیل‌ها آزمایشی‌اند و امتیاز یا درصد توافق، احتمال موفقیت معامله نیست.",
+                        "نمودارها از داده‌های صرافی‌ها رسم می‌شوند. تحلیل‌ها آزمایشی‌اند و امتیاز یا درصد توافق، احتمال موفقیت معامله نیست.",
                         color = Color.Gray,
                         fontSize = 12.sp
                     )
