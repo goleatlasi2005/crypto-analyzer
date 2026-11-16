@@ -1,3 +1,4 @@
+
 package com.cryptoanalyzer
 
 import kotlinx.coroutines.async
@@ -21,7 +22,17 @@ data class ExchangeMultiTimeframeAnalysis(
 class MultiTimeframeAnalysisRepository(
     private val analysisRepository: AnalysisRepository = AnalysisRepository()
 ) {
-    private val timeframes = listOf("15m", "1h", "4h", "1d")
+    // وزن تایم‌فریم‌های بلندمدت بیشتر است؛ 5m نویز بیشتری دارد.
+    private val timeframeWeights = linkedMapOf(
+        "5m" to 0.5,
+        "15m" to 0.75,
+        "1h" to 1.0,
+        "4h" to 1.5,
+        "1d" to 2.0,
+        "1w" to 2.5
+    )
+
+    private val timeframes = timeframeWeights.keys.toList()
 
     suspend fun analyze(
         symbol: String
@@ -46,27 +57,38 @@ class MultiTimeframeAnalysisRepository(
                 TimeframeSignal(timeframe, result?.signal)
             }
 
-            val validSignals = frameSignals.mapNotNull { it.signal }
+            val validSignals = frameSignals.mapNotNull { frame ->
+                val signal = frame.signal ?: return@mapNotNull null
+                Triple(
+                    frame.timeframe,
+                    signal,
+                    timeframeWeights[frame.timeframe] ?: 0.0
+                )
+            }.filter { it.third > 0.0 }
 
             if (validSignals.isEmpty()) {
                 return@mapNotNull null
             }
 
-            val averageRawScore = validSignals.map { it.score }.average()
+            val totalWeight = validSignals.sumOf { it.third }
 
-            val normalizedScore = (averageRawScore / 90.0 * 100.0)
+            val weightedRawScore = validSignals.sumOf { (_, signal, weight) ->
+                signal.score * weight
+            } / totalWeight
+
+            val normalizedScore = (weightedRawScore / 90.0 * 100.0)
                 .toInt()
                 .coerceIn(-100, 100)
 
-            val buyCount = validSignals.count {
-                it.type == SignalType.BUY
-            }
+            val buyWeight = validSignals
+                .filter { it.second.type == SignalType.BUY }
+                .sumOf { it.third }
 
-            val sellCount = validSignals.count {
-                it.type == SignalType.SELL
-            }
+            val sellWeight = validSignals
+                .filter { it.second.type == SignalType.SELL }
+                .sumOf { it.third }
 
-            val directionalCount = buyCount + sellCount
+            val directionalWeight = buyWeight + sellWeight
 
             val finalType = when {
                 normalizedScore >= 45 -> SignalType.BUY
@@ -74,33 +96,28 @@ class MultiTimeframeAnalysisRepository(
                 else -> SignalType.HOLD
             }
 
-            val agreementPercent = if (directionalCount == 0) {
+            val agreementPercent = if (directionalWeight == 0.0) {
                 0
             } else {
-                (maxOf(buyCount, sellCount) * 100.0 / directionalCount)
+                (maxOf(buyWeight, sellWeight) * 100.0 / directionalWeight)
                     .toInt()
             }
 
-            val referenceSignal = when (finalType) {
-                SignalType.BUY -> frameSignals
-                    .firstOrNull {
-                        it.timeframe == "1h" &&
-                            it.signal?.type == SignalType.BUY
-                    }?.signal
-                    ?: frameSignals.firstOrNull {
-                        it.signal?.type == SignalType.BUY
-                    }?.signal
+            // یک‌ساعته مرجع اصلی قیمت ورود است.
+            // در نبود آن، تایم‌فریم‌های معتبر بعدی بررسی می‌شوند.
+            val referencePriority = listOf(
+                "1h", "4h", "15m", "1d", "5m", "1w"
+            )
 
-                SignalType.SELL -> frameSignals
-                    .firstOrNull {
-                        it.timeframe == "1h" &&
-                            it.signal?.type == SignalType.SELL
+            val referenceSignal = if (finalType == SignalType.HOLD) {
+                null
+            } else {
+                referencePriority.firstNotNullOfOrNull { timeframe ->
+                    frameSignals.firstOrNull {
+                        it.timeframe == timeframe &&
+                            it.signal?.type == finalType
                     }?.signal
-                    ?: frameSignals.firstOrNull {
-                        it.signal?.type == SignalType.SELL
-                    }?.signal
-
-                SignalType.HOLD -> null
+                }
             }
 
             ExchangeMultiTimeframeAnalysis(
