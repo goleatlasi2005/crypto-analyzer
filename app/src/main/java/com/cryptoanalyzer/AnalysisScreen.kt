@@ -429,19 +429,7 @@ fun AnalysisScreen(symbol: String) {
 
                             Divider(color = Color.DarkGray)
 
-                            result.timeframeSignals.forEach { frame ->
-                                val frameText = when (frame.signal?.type) {
-                                    SignalType.BUY -> "خرید"
-                                    SignalType.SELL -> "فروش"
-                                    SignalType.HOLD -> "نگهداری"
-                                    null -> "داده کافی نیست"
-                                }
-
-                                Text(
-                                    "${frame.timeframe}: $frameText",
-                                    color = Color.LightGray
-                                )
-                            }
+                            TimeframeSignalTabs(result)
 
                             val reference = result.referenceSignal
 
