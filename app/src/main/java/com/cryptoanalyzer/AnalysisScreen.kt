@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+
 private val analysisBackground = Color(0xFF171326)
 private val analysisCard = Color(0xFF29213D)
 private val analysisPurple = Color(0xFFB68CFF)
@@ -28,11 +29,11 @@ fun AnalysisScreen(symbol: String) {
     var timeframe by remember { mutableStateOf("1h") }
 
     var chartResults by remember {
-        mutableStateOf<List<Pair<String, List<Candle>>>(emptyList())
+        mutableStateOf<List<Pair<String, List<Candle>>>>(emptyList())
     }
 
     var multiResults by remember {
-        mutableStateOf<List<Pair<String, List<Candle>>>>(emptyList())
+        mutableStateOf<List<ExchangeMultiTimeframeAnalysis>>(emptyList())
     }
 
     var loading by remember { mutableStateOf(false) }
@@ -44,7 +45,7 @@ fun AnalysisScreen(symbol: String) {
             errorMessage = null
 
             try {
-                val chartData = kotlinx.coroutines.coroutineScope {
+                val chartData = coroutineScope {
                     val binance = async {
                         runCatching {
                             candleRepository.getBinanceCandles(
@@ -122,8 +123,7 @@ fun AnalysisScreen(symbol: String) {
                             listOf("4h", "1d", "1w")
                         ).forEach { rowFrames ->
                             Row(
-                                horizontalArrangement =
-                                    Arrangement.spacedBy(6.dp)
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 rowFrames.forEach { frame ->
                                     FilterChip(
