@@ -42,21 +42,17 @@ private data class MarketTicker(
 
 private val client = OkHttpClient()
 
-private suspend fun fetchTicker(symbol: String): MarketTicker =
+private suspend fun fetchBinance(symbol: String): MarketTicker =
     withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url("https://api.binance.com/api/v3/ticker/24hr?symbol=$symbol")
             .build()
 
         client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) {
-                error("خطای Binance: ${response.code}")
-            }
-
+            if (!response.isSuccessful) error("خطای Binance: ${response.code}")
             val json = JSONObject(
                 response.body?.string() ?: error("پاسخی دریافت نشد")
             )
-
             MarketTicker(
                 json.getString("lastPrice").toDouble(),
                 json.getString("priceChangePercent").toDouble(),
@@ -67,34 +63,131 @@ private suspend fun fetchTicker(symbol: String): MarketTicker =
         }
     }
 
+private suspend fun fetchNobitex(): Map<String, MarketTicker> =
+    withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url("https://apiv2.nobitex.ir/market/stats?srcCurrency=btc,eth&dstCurrency=usdt")
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) error("خطای Nobitex: ${response.code}")
+            val json = JSONObject(
+                response.body?.string() ?: error("پاسخی دریافت نشد")
+            )
+
+            if (json.optString("status") != "ok") {
+                error("پاسخ نامعتبر از Nobitex")
+            }
+
+            val stats = json.getJSONObject("stats")
+            val result = mutableMapOf<String, MarketTicker>()
+
+            listOf("btc", "eth").forEach { coin ->
+                val item = stats.optJSONObject("$coin-usdt")
+                    ?: error("اطلاعات ${coin.uppercase()} در نوبیتکس موجود نیست")
+
+                result[coin.uppercase()] = MarketTicker(
+                    item.getString("latest").toDouble(),
+                    item.optString("dayChange", "0").toDouble(),
+                    item.optString("dayHigh", "0").toDouble(),
+                    item.optString("dayLow", "0").toDouble(),
+                    item.optString("volumeSrc", "0").toDouble()
+                )
+            }
+            result
+        }
+    }
+
 private fun formatNumber(value: Double): String =
     DecimalFormat("#,##0.00").format(value)
 
 @Composable
+private fun ExchangeCard(
+    exchange: String,
+    coin: String,
+    data: MarketTicker?,
+    error: String?,
+    updatedAt: String
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFF29213D)
+        ),
+        shape = RoundedCornerShape(18.dp)
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                exchange,
+                color = Color(0xFFD8B4FE),
+                fontSize = 19.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                "$coin / USDT",
+                color = Color.White,
+                fontSize = 16.sp
+            )
+
+            if (data != null) {
+                Text(
+                    "$${formatNumber(data.price)}",
+                    color = Color.White,
+                    fontSize = 27.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "تغییر ۲۴ ساعته: ${
+                        String.format(Locale.US, "%+.2f%%", data.change)
+                    }",
+                    color = if (data.change >= 0)
+                        Color(0xFF4ADE80) else Color(0xFFF87171)
+                )
+                Text("بیشترین قیمت: $${formatNumber(data.high)}", color = Color.LightGray)
+                Text("کمترین قیمت: $${formatNumber(data.low)}", color = Color.LightGray)
+                Text("حجم: ${formatNumber(data.volume)} $coin", color = Color.LightGray)
+                Text("آخرین به‌روزرسانی: $updatedAt", color = Color(0xFFD8B4FE), fontSize = 12.sp)
+            } else {
+                Text(
+                    error ?: "در حال دریافت اطلاعات...",
+                    color = if (error != null) Color(0xFFF87171) else Color.LightGray
+                )
+            }
+        }
+    }
+}
+
+@Composable
 fun CryptoAnalyzerApp() {
     var selectedCoin by remember { mutableStateOf("BTC") }
-    var ticker by remember { mutableStateOf<MarketTicker?>(null) }
-    var loading by remember { mutableStateOf(true) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var binance by remember { mutableStateOf<MarketTicker?>(null) }
+    var nobitex by remember { mutableStateOf<MarketTicker?>(null) }
+    var binanceError by remember { mutableStateOf<String?>(null) }
+    var nobitexError by remember { mutableStateOf<String?>(null) }
     var updatedAt by remember { mutableStateOf("") }
 
     LaunchedEffect(selectedCoin) {
-        ticker = null
-        loading = true
-        errorMessage = null
-
         while (true) {
             try {
-                ticker = fetchTicker("${selectedCoin}USDT")
-                errorMessage = null
-                updatedAt = SimpleDateFormat(
-                    "HH:mm:ss", Locale.getDefault()
-                ).format(Date())
+                binance = fetchBinance("${selectedCoin}USDT")
+                binanceError = null
             } catch (e: Exception) {
-                errorMessage = e.message ?: "خطا در دریافت اطلاعات"
-            } finally {
-                loading = false
+                binanceError = e.message ?: "خطا در دریافت Binance"
             }
+
+            try {
+                val all = fetchNobitex()
+                nobitex = all[selectedCoin]
+                nobitexError = null
+            } catch (e: Exception) {
+                nobitexError = e.message ?: "خطا در دریافت Nobitex"
+            }
+
+            updatedAt = SimpleDateFormat(
+                "HH:mm:ss", Locale.getDefault()
+            ).format(Date())
 
             delay(15_000)
         }
@@ -103,7 +196,7 @@ fun CryptoAnalyzerApp() {
     MaterialTheme {
         Surface(
             modifier = Modifier.fillMaxSize(),
-            color = Color(0xFF101827)
+            color = Color(0xFF171126)
         ) {
             LazyColumn(
                 modifier = Modifier.padding(16.dp),
@@ -112,8 +205,8 @@ fun CryptoAnalyzerApp() {
                 item {
                     Text(
                         "Crypto Analyzer",
-                        color = Color.White,
-                        fontSize = 26.sp,
+                        color = Color(0xFFE9D5FF),
+                        fontSize = 27.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
@@ -128,10 +221,8 @@ fun CryptoAnalyzerApp() {
                             Button(
                                 onClick = { selectedCoin = coin },
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor =
-                                        if (selectedCoin == coin)
-                                            Color(0xFF2563EB)
-                                        else Color(0xFF263449)
+                                    containerColor = if (selectedCoin == coin)
+                                        Color(0xFF9333EA) else Color(0xFF3B3150)
                                 )
                             ) {
                                 Text(coin)
@@ -141,142 +232,72 @@ fun CryptoAnalyzerApp() {
                 }
 
                 item {
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = Color(0xFF1E293B)
-                        ),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Column(Modifier.padding(20.dp)) {
-                            Text(
-                                "$selectedCoin / USDT",
-                                color = Color.White,
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-
-                            Spacer(Modifier.height(12.dp))
-
-                            val data = ticker
-
-                            if (data != null) {
-                                Text(
-                                    "$${formatNumber(data.price)}",
-                                    color = Color.White,
-                                    fontSize = 30.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-
-                                Text(
-                                    "تغییر ۲۴ ساعته: ${
-                                        String.format(
-                                            Locale.US,
-                                            "%+.2f%%",
-                                            data.change
-                                        )
-                                    }",
-                                    color = if (data.change >= 0)
-                                        Color(0xFF4ADE80)
-                                    else Color(0xFFF87171),
-                                    fontSize = 16.sp
-                                )
-
-                                Spacer(Modifier.height(12.dp))
-
-                                Text(
-                                    "بیشترین قیمت: $${formatNumber(data.high)}",
-                                    color = Color.LightGray
-                                )
-                                Text(
-                                    "کمترین قیمت: $${formatNumber(data.low)}",
-                                    color = Color.LightGray
-                                )
-                                Text(
-                                    "حجم معاملات: ${formatNumber(data.volume)} $selectedCoin",
-                                    color = Color.LightGray
-                                )
-                                Text(
-                                    "آخرین به‌روزرسانی: $updatedAt",
-                                    color = Color(0xFF60A5FA),
-                                    fontSize = 12.sp
-                                )
-                            } else if (loading) {
-                                Text(
-                                    "در حال دریافت قیمت از Binance...",
-                                    color = Color.LightGray
-                                )
-                            }
-
-                            if (errorMessage != null) {
-                                Text(
-                                    errorMessage!!,
-                                    color = Color(0xFFF87171)
-                                )
-                                Text(
-                                    "اتصال اینترنت و دسترسی به Binance را بررسی کنید.",
-                                    color = Color.LightGray
-                                )
-                            }
-
-                            Spacer(Modifier.height(8.dp))
-
-                            Text(
-                                "منبع داده: Binance | به‌روزرسانی هر ۱۵ ثانیه",
-                                color = Color(0xFF60A5FA),
-                                fontSize = 12.sp
-                            )
-                        }
-                    }
+                    ExchangeCard(
+                        "Binance",
+                        selectedCoin,
+                        binance,
+                        binanceError,
+                        updatedAt
+                    )
                 }
 
                 item {
-                    Text(
-                        "تایم‌فریم‌ها",
-                        color = Color.White,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
+                    ExchangeCard(
+                        "Nobitex",
+                        selectedCoin,
+                        nobitex,
+                        nobitexError,
+                        updatedAt
                     )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        listOf("5m", "15m", "1h", "4h", "1d", "1w").forEach {
-                            Text(it, color = Color.White, fontSize = 13.sp)
-                        }
-                    }
                 }
 
                 item {
-                    Text(
-                        "سیگنال تحلیل",
-                        color = Color.White,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    val a = binance?.price
+                    val b = nobitex?.price
                     Card(
                         colors = CardDefaults.cardColors(
-                            containerColor = Color(0xFF1E293B)
+                            containerColor = Color(0xFF29213D)
                         )
                     ) {
                         Column(Modifier.padding(18.dp)) {
                             Text(
-                                "در انتظار تحلیل",
-                                color = Color(0xFFFBBF24),
-                                fontSize = 20.sp
+                                "مقایسه قیمت دو صرافی",
+                                color = Color(0xFFD8B4FE),
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
                             )
-                            Text(
-                                "سیگنال‌ها پس از پیاده‌سازی اندیکاتورها نمایش داده می‌شوند.",
-                                color = Color.LightGray
-                            )
+                            if (a != null && b != null) {
+                                Text(
+                                    "اختلاف قیمت: $${formatNumber(kotlin.math.abs(a - b))}",
+                                    color = Color.White
+                                )
+                            } else {
+                                Text(
+                                    "پس از دریافت قیمت هر دو صرافی نمایش داده می‌شود.",
+                                    color = Color.LightGray
+                                )
+                            }
                         }
                     }
+                }
+
+                item {
+                    Text("تایم‌فریم‌ها", color = Color.White, fontSize = 18.sp)
+                    Text("5m   15m   1h   4h   1d   1w", color = Color.LightGray)
+                }
+
+                item {
+                    Text("سیگنال تحلیل", color = Color.White, fontSize = 18.sp)
+                    Text(
+                        "در انتظار پیاده‌سازی اندیکاتورها",
+                        color = Color(0xFFFBBF24)
+                    )
                 }
 
                 item {
                     Text(
                         "RSI • MACD • EMA • SMA • Bollinger Bands • Ichimoku • Fibonacci • Volume",
-                        color = Color.LightGray,
-                        fontSize = 14.sp
+                        color = Color.LightGray
                     )
                 }
 
