@@ -15,6 +15,8 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import java.util.Locale
+import kotlin.math.abs
 
 private val analysisBackground = Color(0xFF171326)
 private val analysisCard = Color(0xFF29213D)
@@ -455,6 +457,38 @@ fun AnalysisScreen(symbol: String) {
                                     "هدف دوم: ${reference.takeProfit2}",
                                     color = Color(0xFF4ADE80)
                                 )
+
+                                val risk = abs(
+                                    reference.entryPrice - reference.stopLoss
+                                )
+
+                                if (risk > 0.0) {
+                                    val reward1 = abs(
+                                        reference.takeProfit1 - reference.entryPrice
+                                    )
+                                    val reward2 = abs(
+                                        reference.takeProfit2 - reference.entryPrice
+                                    )
+
+                                    val ratio1 = reward1 / risk
+                                    val ratio2 = reward2 / risk
+
+                                    Text(
+                                        "نسبت ریسک به بازده هدف اول: ۱ به ${
+                                            String.format(Locale.US, "%.2f", ratio1)
+                                        }",
+                                        color = Color(0xFF4ADE80),
+                                        fontWeight = FontWeight.Bold
+                                    )
+
+                                    Text(
+                                        "نسبت ریسک به بازده هدف دوم: ۱ به ${
+                                            String.format(Locale.US, "%.2f", ratio2)
+                                        }",
+                                        color = Color(0xFF4ADE80),
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
                         }
                     }
@@ -462,7 +496,7 @@ fun AnalysisScreen(symbol: String) {
 
                 item {
                     Text(
-                        "نمودارها از داده‌های صرافی‌ها رسم می‌شوند. تحلیل‌ها آزمایشی‌اند و امتیاز یا درصد توافق، احتمال موفقیت معامله نیست.",
+                        "نسبت ریسک به بازده بر اساس فاصله قیمت ورود تا حد ضرر و اهداف محاسبه می‌شود. این نسبت تخمینی است و سودآوری معامله را تضمین نمی‌کند. نمودارها از داده‌های صرافی‌ها رسم می‌شوند و امتیاز یا درصد توافق، احتمال موفقیت معامله نیست.",
                         color = Color.Gray,
                         fontSize = 12.sp
                     )
